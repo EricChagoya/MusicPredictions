@@ -1,0 +1,61 @@
+---
+title: "MyFireMixtape"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r Load Data}
+music <- read.csv("music.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+## Data Cleaning
+
+We remove features that have at least half of their data missing or are non-informative.
+
+
+```{r Data Cleaning}
+# This one removes all the super unnecessary features
+keep <- c("artist.familiarity","artist.hotttnesss",	"artist.name",
+          "artist.terms",	"song.bars_confidence",	"song.bars_start",
+          "song.beats_confidence",	"song.beats_start",
+          "song.duration", "song.end_of_fade_in",	"song.hotttnesss",
+          "song.key", "song.key_confidence",	"song.loudness",
+          "song.mode", "song.mode_confidence", 
+          "song.start_of_fade_out", "song.tatums_confidence",
+          "song.tatums_start", "song.tempo", "song.time_signature", 
+          "song.time_signature_confidence",	"song.year"
+) 
+
+# This one is just the variables we are going to use for our analysis
+# I just choose a subsection so it's easier to see
+keep2 <- c("song.hotttnesss", "artist.familiarity", "artist.name", 
+           "artist.hotttnesss", "artist.terms", "song.loudness", 
+           "song.tempo")
+
+smallMusic <- music[keep]
+smallMusic2 <- music[keep2]
+```
+
+
+```{r Remove Missing Data}
+# This dataset writes it's missing values as -1 and 0 which is really confusing.
+# If we are predicting on a song's hotness, we remove all the rows where we don't know the outcome.
+# We have a remaining 4000 rows. We lost about 60% of the data.
+
+smallMusic2 <- subset(smallMusic2, song.hotttnesss > 0)
+```
+
+```{r Summary}
+summary(smallMusic2)
+
+
+#table(smallMusic2$artist.terms)
+
+```
+
+
