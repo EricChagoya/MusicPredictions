@@ -1,0 +1,135 @@
+---
+title: "My Fire Mixtape"
+author: "Eric, Yingtong, Jatin"
+date: "3/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(bayesplot)
+library(rstanarm)
+library(rstan)
+library(bayesrules)
+library(tidyverse)
+library(janitor)
+```
+
+
+
+```{r Load Data}
+music <- read.csv("music.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+## Data Cleaning
+
+We remove features that have at least half of their data missing or are non-informative.
+
+
+```{r Data Cleaning}
+# This one removes all the super unnecessary features
+keep <- c("artist.familiarity","artist.hotttnesss",	"artist.name",
+          "artist.terms",	"song.bars_confidence",	"song.bars_start",
+          "song.beats_confidence",	"song.beats_start",
+          "song.duration", "song.end_of_fade_in",	"song.hotttnesss",
+          "song.key", "song.key_confidence",	"song.loudness",
+          "song.mode", "song.mode_confidence", 
+          "song.start_of_fade_out", "song.tatums_confidence",
+          "song.tatums_start", "song.tempo", "song.time_signature", 
+          "song.time_signature_confidence",	"song.year"
+) 
+# This one is just the variables we are going to use for our analysis
+# I just choose a subsection so it's easier to see
+keep2 <- c("song.hotttnesss", "artist.familiarity", "artist.name", 
+           "artist.hotttnesss", "artist.terms", "song.loudness", 
+           "song.tempo", "song.duration", "song.key", "song.time_signature")
+smallMusic <- music[keep]
+smallMusic2 <- music[keep2]
+```
+
+
+```{r Remove Missing Data}
+# This dataset writes it's missing values as -1 and 0 which is really confusing.
+# If we are predicting on a song's hotness, we remove all the rows where we don't know the outcome.
+# We have a remaining 4000 rows. We lost about 60% of the data.
+smallMusic2 <- subset(smallMusic2, song.hotttnesss > 0)
+smallMusic <- subset(smallMusic, song.hotttnesss > 0)
+
+```
+
+```{r Summary}
+summary(smallMusic2)
+#table(smallMusic2$artist.terms)
+
+ggplot(smallMusic2, aes(y=song.hotttnesss, x=song.duration)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
+
+ggplot(smallMusic2, aes(y=song.hotttnesss, x=artist.familiarity)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
+
+ggplot(smallMusic2, aes(y=song.hotttnesss, x=song.tempo)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
+
+ggplot(smallMusic2, aes(y=artist.hotttnesss, x=artist.familiarity)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
+
+ggplot(smallMusic2, aes(song.time_signature)) +
+  geom_density(size = 0.2)
+
+
+
+```
+
+```{r}
+#don't work: song.duration, song.tempo, song.loudness, song.time_signature, song.key
+
+
+
+model <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss +song.bars_confidence + song.bars_start +
+          song.beats_confidence + song.beats_start + song.end_of_fade_in + song.key_confidence + song.mode + song.mode_confidence +
+          song.start_of_fade_out + song.tatums_start + song.time_signature_confidence + song.year,
+          family = binomial, data = smallMusic,
+          chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
+
+model4 <- stan_glm(song.hotttnesss ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
+          family = gaussian, data = smallMusic,
+          chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
+
+model3 <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
+          family = binomial, data = smallMusic,
+          chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
+```
+
+```{r}
+summary(model)
+summary(model3)
+summary(model4)
+pp_check(model4)
+pp_check(model3)
+
+prior_summary(model3)
+```
+
+```{r}
+prior_summary(model3)
+mcmc_trace(model3)
+mcmc_dens_overlay(model3)
+
+model_summary <- as.data.frame(summary(model3))
+model_summary
+
+```
+
+```{r}
+posterior_interval(model3, prob = 0.80)
+posterior_interval(model4, prob = 0.80)
+
+```
+
