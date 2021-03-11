@@ -5,10 +5,6 @@ date: "3/6/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ```{r message=FALSE}
 library(bayesplot)
 library(rstanarm)
@@ -60,6 +56,7 @@ smallMusic <- subset(smallMusic, song.hotttnesss > 0)
 
 ```
 
+# Initial Visualizations
 ```{r Summary}
 summary(smallMusic2)
 #table(smallMusic2$artist.terms)
@@ -87,49 +84,82 @@ ggplot(smallMusic2, aes(song.time_signature)) +
 
 ```
 
+
+# Model Fitting
 ```{r}
-#don't work: song.duration, song.tempo, song.loudness, song.time_signature, song.key
+#don't work: song.duration, song.tempo, song.loudness, song.time_signature, song.ke
 
-
-
-model <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss +song.bars_confidence + song.bars_start +
-          song.beats_confidence + song.beats_start + song.end_of_fade_in + song.key_confidence + song.mode + song.mode_confidence +
-          song.start_of_fade_out + song.tatums_start + song.time_signature_confidence + song.year,
-          family = binomial, data = smallMusic,
-          chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
-
-model4 <- stan_glm(song.hotttnesss ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
+model_g <- stan_glm(song.hotttnesss ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
           family = gaussian, data = smallMusic,
           chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
 
-model3 <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
+model_b <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
           family = binomial, data = smallMusic,
           chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
 ```
 
+# Model Summary
 ```{r}
-summary(model)
-summary(model3)
-summary(model4)
-pp_check(model4)
-pp_check(model3)
+summary(model_g)
+summary(model_b)
 
-prior_summary(model3)
+prior_summary(model_g)
+prior_summary(model_b)
+```
+
+# Model Fit Visualization
+```{r}
+mcmc_trace(model_g)
+mcmc_dens_overlay(model_g)
+pp_check(model_g)
+
+mcmc_trace(model_b)
+mcmc_dens_overlay(model_b)
+pp_check(model_b)
+
+```
+
+
+# Credible Intervals
+```{r}
+posterior_interval(model_g, prob = 0.80)
+posterior_interval(model_b, prob = 0.80)
+```
+
+
+# Posterior Prediction
+```{r}
+set.seed(84735)
+#pred_g <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = 0.5, #artist.hotttnesss = 0.2))
+#pred_b <- posterior_predict(model_b, newdata = smallMusic2)
+
+beyonce <- c(0.89, 0.61) # This is researched information (2010)
+predict_beyonce <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = beyonce[1], 
+                                                                   artist.hotttnesss = beyonce[2]))
+mcmc_dens(predict_beyonce)
+
+amber_nicholson <- c(0.30328380, 0)
+predict_amber <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = amber_nicholson[1], 
+                                                                   artist.hotttnesss = amber_nicholson[2]))
+mcmc_dens(predict_amber)
+
+bill_boyd_cowboy_ramblers <- c(0, 0)
+predict_bill <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = bill_boyd_cowboy_ramblers[1], 
+                                                                   artist.hotttnesss = bill_boyd_cowboy_ramblers[2]))
+mcmc_dens(predict_bill)
+#mcmc_dens(pred_g)
+#mcmc_dens(pred_b)
 ```
 
 ```{r}
-prior_summary(model3)
-mcmc_trace(model3)
-mcmc_dens_overlay(model3)
+predictions <- data.frame(y_new = predict_beyonce[,1]) 
+predictions %>% 
+  summarize(lower_80 = quantile(y_new, 0.1),
+    upper_80 = quantile(y_new, 0.9))
 
-model_summary <- as.data.frame(summary(model3))
-model_summary
-
-```
-
-```{r}
-posterior_interval(model3, prob = 0.80)
-posterior_interval(model4, prob = 0.80)
-
+predictions <- data.frame(y_new = predict_bill[,1]) 
+predictions %>% 
+  summarize(lower_80 = quantile(y_new, 0.1),
+    upper_80 = quantile(y_new, 0.9))
 ```
 
