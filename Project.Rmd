@@ -14,8 +14,6 @@ library(tidyverse)
 library(janitor)
 ```
 
-
-
 ```{r Load Data}
 music <- read.csv("music.csv", header=TRUE, stringsAsFactors=FALSE)
 ```
@@ -61,28 +59,55 @@ smallMusic <- subset(smallMusic, song.hotttnesss > 0)
 summary(smallMusic2)
 #table(smallMusic2$artist.terms)
 
-ggplot(smallMusic2, aes(y=song.hotttnesss, x=song.duration)) +
+ggplot(smallMusic2, aes(x = artist.familiarity, y = song.hotttnesss)) +
   geom_point(size = 0.2) +
   geom_smooth(method = "lm")
 
-ggplot(smallMusic2, aes(y=song.hotttnesss, x=artist.familiarity)) +
+ggplot(smallMusic2, aes(x = artist.hotttnesss, y = song.hotttnesss)) +
   geom_point(size = 0.2) +
   geom_smooth(method = "lm")
 
-ggplot(smallMusic2, aes(y=song.hotttnesss, x=song.tempo)) +
+ggplot(smallMusic2, aes(x = artist.familiarity, y=artist.hotttnesss)) +
   geom_point(size = 0.2) +
   geom_smooth(method = "lm")
 
-ggplot(smallMusic2, aes(y=artist.hotttnesss, x=artist.familiarity)) +
+ggplot(smallMusic2, aes(x = song.loudness, y=song.hotttnesss)) +
   geom_point(size = 0.2) +
   geom_smooth(method = "lm")
 
-ggplot(smallMusic2, aes(song.time_signature)) +
-  geom_density(size = 0.2)
+ggplot(smallMusic2, aes(x = song.duration, y=song.hotttnesss)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
 
-
-
+ggplot(smallMusic2, aes(x = song.tempo, y=song.hotttnesss)) +
+  geom_point(size = 0.2) +
+  geom_smooth(method = "lm")
 ```
+
+# Prior Model
+
+```{r}
+# Beta_0
+plot_normal(0.15, 0.1) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = 'beta_0')
+
+# Beta_1 
+plot_normal(0.5, 0.18) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = 'beta_1')
+
+# Beta_2
+plot_normal(0.4, 0.2) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = 'beta_2')
+
+# Beta_3
+plot_normal(0.22, 0.1) + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = 'beta_3')
+```
+
 
 
 # Model Fitting
@@ -92,19 +117,13 @@ ggplot(smallMusic2, aes(song.time_signature)) +
 model_g <- stan_glm(song.hotttnesss ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
           family = gaussian, data = smallMusic,
           chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
-
-model_b <- stan_glm(round(song.hotttnesss) ~ artist.familiarity + artist.hotttnesss + artist.familiarity:artist.hotttnesss,
-          family = binomial, data = smallMusic,
-          chains = 4, iter = 5000*2, seed = 84735, refresh = FALSE)
 ```
 
 # Model Summary
 ```{r}
 summary(model_g)
-summary(model_b)
 
 prior_summary(model_g)
-prior_summary(model_b)
 ```
 
 # Model Fit Visualization
@@ -112,47 +131,43 @@ prior_summary(model_b)
 mcmc_trace(model_g)
 mcmc_dens_overlay(model_g)
 pp_check(model_g)
-
-mcmc_trace(model_b)
-mcmc_dens_overlay(model_b)
-pp_check(model_b)
-
 ```
 
 
 # Credible Intervals
 ```{r}
 posterior_interval(model_g, prob = 0.80)
-posterior_interval(model_b, prob = 0.80)
 ```
 
 
 # Posterior Prediction
 ```{r}
 set.seed(84735)
-#pred_g <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = 0.5, #artist.hotttnesss = 0.2))
-#pred_b <- posterior_predict(model_b, newdata = smallMusic2)
 
 beyonce <- c(0.89, 0.61) # This is researched information (2010)
 predict_beyonce <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = beyonce[1], 
                                                                    artist.hotttnesss = beyonce[2]))
-mcmc_dens(predict_beyonce)
+mcmc_dens(predict_beyonce) +
+  xlab("Beyoncé's Song Hotttnesss")
 
 amber_nicholson <- c(0.30328380, 0)
-predict_amber <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = amber_nicholson[1], 
-                                                                   artist.hotttnesss = amber_nicholson[2]))
-mcmc_dens(predict_amber)
+predict_amber <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = amber_nicholson[1], artist.hotttnesss = amber_nicholson[2]))
+mcmc_dens(predict_amber) +
+  xlab("Amber Nicholson's Song Hotttnesss")
 
 bill_boyd_cowboy_ramblers <- c(0, 0)
-predict_bill <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = bill_boyd_cowboy_ramblers[1], 
-                                                                   artist.hotttnesss = bill_boyd_cowboy_ramblers[2]))
-mcmc_dens(predict_bill)
-#mcmc_dens(pred_g)
-#mcmc_dens(pred_b)
+predict_bill <- posterior_predict(model_g, newdata = data.frame(artist.familiarity = bill_boyd_cowboy_ramblers[1], artist.hotttnesss = bill_boyd_cowboy_ramblers[2]))
+mcmc_dens(predict_bill) +
+  xlab("Billy Boyd Cowboy Ramblers' Song Hotttnesss")
 ```
 
 ```{r}
 predictions <- data.frame(y_new = predict_beyonce[,1]) 
+predictions %>% 
+  summarize(lower_80 = quantile(y_new, 0.1),
+    upper_80 = quantile(y_new, 0.9))
+
+predictions <- data.frame(y_new = predict_amber[,1]) 
 predictions %>% 
   summarize(lower_80 = quantile(y_new, 0.1),
     upper_80 = quantile(y_new, 0.9))
